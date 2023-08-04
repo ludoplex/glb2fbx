@@ -44,12 +44,12 @@ class Glb2Fbx:
         self.output_container_dir = output_container_dir
 
         # map input/output_container_dir to input_tmp_dir, our directory of
-        self.volumes = dict()
-        self.volumes[self.input_tmp_dir] = {
-            'bind': self.input_container_dir, 'mode': 'rw'}
-        self.volumes[Path(output_fbx_file).absolute().parent.__str__()] = {
-            'bind': self.output_container_dir, 'mode': 'rw'}
-
+        self.volumes = {
+            self.input_tmp_dir: {'bind': self.input_container_dir, 'mode': 'rw'},
+            Path(output_fbx_file)
+            .absolute()
+            .parent.__str__(): {'bind': self.output_container_dir, 'mode': 'rw'},
+        }
         # check and consolodate the input files into tmp dir, and swap out paths
         # for container input path (which are mapped to where the files are
         # consolidated to)
@@ -70,7 +70,7 @@ class Glb2Fbx:
     def containerize_file(self, source_file):
         source_file = Path(source_file).absolute().__str__()
         dest_file = Path(self.input_tmp_dir, Path(source_file).name).__str__()
-        print("Copying %s to %s" % (source_file, dest_file))
+        print(f"Copying {source_file} to {dest_file}")
         shutil.copyfile(source_file, dest_file)
         return self.swap_directory_paths(source_file, self.input_container_dir)
 
@@ -79,11 +79,8 @@ class Glb2Fbx:
         Do the business.
 
         """
-        cmd = "./blender_app/blender -b -P %s -- %s %s" % (
-            self.input_blender_script_file,
-            self.input_source_glb_file,
-            self.output_fbx_file)
-        print("Executing: %s in container." % cmd)
+        cmd = f"./blender_app/blender -b -P {self.input_blender_script_file} -- {self.input_source_glb_file} {self.output_fbx_file}"
+        print(f"Executing: {cmd} in container.")
 
         _log = self.client.containers.run(
             self.image,
@@ -97,7 +94,9 @@ class Glb2Fbx:
 
         if self.debug:
             print("Did you not get what you wanted? Here's the docker cmd to debug:")
-            print("docker run -itv %s:%s %s bash" % (self.input_tmp_dir.lower(), self.input_container_dir, self.image))
+            print(
+                f"docker run -itv {self.input_tmp_dir.lower()}:{self.input_container_dir} {self.image} bash"
+            )
             print("Run this inside the container:")
             print(cmd)
         else:
@@ -107,7 +106,7 @@ class Glb2Fbx:
         return self.returned_output_fbx_file
 
     def check_input_file(self, input_file, extension):
-        _error = "%s either doesn't exist, or is wrong type." % input_file
+        _error = f"{input_file} either doesn't exist, or is wrong type."
         if isinstance(extension, list):
             for ext in extension:
                 if self.is_valid_file(input_file, ext):
@@ -119,9 +118,9 @@ class Glb2Fbx:
 
     def check_output_file_dir(self, _file, extension):
         if not self.is_file_type(_file, extension):
-            raise ValueError("%s needs to end with: %s" % (_file, extension))
+            raise ValueError(f"{_file} needs to end with: {extension}")
         if not Path(_file).parent.exists():
-            raise ValueError("%s does not exist." % Path(_file).parent)
+            raise ValueError(f"{Path(_file).parent} does not exist.")
 
     def is_file_type(self, _file, extension):
         return _file.lower().endswith(extension.lower())
